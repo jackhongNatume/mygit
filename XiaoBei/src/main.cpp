@@ -8,6 +8,13 @@
 
 #define THRESHOLD_RMS   (500)           // RMS 阈值，用于判断是否正在说话
 
+
+
+const char *wifiData[][2] = {
+    {"111", "12345678"}, // 替换为自己常用的wifi名和密码
+    {"222", "12345678"},
+    // 继续添加需要的 Wi-Fi 名称和密码
+};
 // 缓冲区用于存储音频数据
 uint8_t buffer[BUFFER_SIZE];
 
