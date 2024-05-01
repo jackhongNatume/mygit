@@ -1,20 +1,21 @@
 #include "Arduino.h"
 #include "driver/i2s.h"
+#include "ArduinoJson.h"
+#include <WiFi.h>
 
 #define SAMPLE_RATE     (8000)          // 采样率为8kHz
 #define SAMPLE_BITS     (16)            // 采样位数为16位
 #define BUFFER_SIZE     (2048)          // 缓冲区大小，用于存储音频数据
 #define SILENCE_TIMEOUT (5000)          // 沉默超时时间，单位毫秒
-
 #define THRESHOLD_RMS   (500)           // RMS 阈值，用于判断是否正在说话
 
 
+// WiFi 网络设置
+const char* ssid = "your_network_ssid";
+const char* password = "your_network_password";
+const char* server_ip = "162.105.183.51";
+const uint16_t server_port = 12347;
 
-const char *wifiData[][2] = {
-    {"111", "12345678"}, // 替换为自己常用的wifi名和密码
-    {"222", "12345678"},
-    // 继续添加需要的 Wi-Fi 名称和密码
-};
 // 缓冲区用于存储音频数据
 uint8_t buffer[BUFFER_SIZE];
 
@@ -52,8 +53,20 @@ uint32_t calculateRMS(uint8_t *data, size_t len) {
     return rms;
 }
 
+// 连接 WiFi 网络
+void connectWiFi() {
+    WiFi.begin(ssid, password);
+    Serial.print("Connecting to WiFi");
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("Connected to WiFi");
+}
+
 void setup() {
     Serial.begin(115200);
+    connectWiFi();
     initI2S();
 }
 
@@ -86,9 +99,21 @@ void loop() {
     }
 
     if (is_speaking) {
-        // 将当前一段音频 raw 数据存入缓冲区 buffer，并发送给服务器
-        // sendAudioToServer(buffer, bytes_read);
-        // 这里你可以将 buffer 数据发送给服务器
+        // 连接服务器
+        WiFiClient client;
+        if (client.connect(server_ip, server_port)) {
+            Serial.println("Connected to server");
+            // 将当前一段音频数据发送给服务器
+            client.write(buffer, bytes_read);
+            // 发送结束状态
+            uint8_t state = 1;
+            client.write(&state, sizeof(state));
+            Serial.println("Data sent to server");
+            // 关闭连接
+            client.stop();
+        } else {
+            Serial.println("Connection to server failed");
+        }
     }
 
     delay(10); // 延时等待
