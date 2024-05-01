@@ -99,15 +99,22 @@ void loop() {
     }
 
     if (is_speaking) {
-        // 连接服务器
+        StaticJsonDocument<512> doc;
+        JsonArray data_array = doc.createNestedArray("data");
+        for (size_t i = 0; i < bytes_read; i += 2) {
+            int16_t sample = (buffer[i + 1] << 8) | buffer[i];
+            data_array.add(sample);
+        }
+        doc["state"] = 10;
+        doc["encoding"] = "utf-8";
+        String json_data;
+        serializeJson(doc, json_data);
+        // 创建 TCP socket
         WiFiClient client;
         if (client.connect(server_ip, server_port)) {
             Serial.println("Connected to server");
             // 将当前一段音频数据发送给服务器
-            client.write(buffer, bytes_read);
-            // 发送结束状态
-            uint8_t state = 1;
-            client.write(&state, sizeof(state));
+            client.print(json_data);
             Serial.println("Data sent to server");
             // 关闭连接
             client.stop();
