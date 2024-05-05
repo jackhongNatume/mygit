@@ -101,12 +101,20 @@ void loop() {
     if (is_speaking) {
         StaticJsonDocument<512> doc;
         JsonArray data_array = doc.createNestedArray("data");
-        for (size_t i = 0; i < bytes_read; i += 2) {
-            int16_t sample = (buffer[i + 1] << 8) | buffer[i];
-            data_array.add(sample);
-        }
-        doc["state"] = 10;
+
+        size_t num_slices = bytes_read / 1024 + (bytes_read % 1024 != 0);
+        for (size_t i = 0; i < num_slices; ++i) {
+            size_t start_index = i * 1024;
+            size_t end_index = min((i + 1) * 1024, bytes_read);
+
+            for (size_t j = start_index; j < end_index; ++j) {
+                int16_t sample = (buffer[j * 2 + 1] << 8) | buffer[j * 2];
+                data_array.add(sample);
+            }
+        doc["state"] = (i == num_slices - 1) ? 0 : 10;
         doc["encoding"] = "utf-8";
+        doc["state"] = 10;
+
         String json_data;
         serializeJson(doc, json_data);
         // 创建 TCP socket
@@ -120,6 +128,7 @@ void loop() {
             client.stop();
         } else {
             Serial.println("Connection to server failed");
+        }
         }
     }
 
