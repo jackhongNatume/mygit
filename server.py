@@ -4,7 +4,7 @@ import wave
 import numpy as np
 
 # 设置服务器的IP地址和端口号
-HOST = '0.0.0.0'
+HOST = '192.168.59.37'
 PORT = 12347
 
 received_arrays =[]
@@ -44,14 +44,15 @@ while True:
     received_arrays.append(received_array)
     received_state = received_json['state']
     received_encoding = received_json['encoding']
-    if(received_state==0):
-        print("finished")
-        break
 
 # 输出接收到的数据
     print('接收到的数组:', received_array)
     print('接收到的数字:', received_state)
     print('接收到的字符串编码:', received_encoding)
+
+    if(received_state==0):
+        print("finished")
+        break
     
 # 关闭连接
     client_socket.close()
