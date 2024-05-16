@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <freertos/queue.h>
 #include <esp_wifi.h>
 
 #define SAMPLE_RATE         (8000)
@@ -12,6 +13,7 @@
 #define SILENCE_TIMEOUT     (5000)
 #define THRESHOLD_RMS       (500)
 #define CONVERSATION_TIMEOUT (180000)
+#define QUEUELENGTH         (5)
 #define AWAKE_PIN           34
 
 const char* ssid = "your_network_ssid";
@@ -71,6 +73,7 @@ void connectWiFi() {
     Serial.println("Connected to WiFi");
 }
 
+QueueHandle_t audioQueue;
 // 声音检测任务
 void audioTask(void * parameter) {
     unsigned long silence_start_time = 0;
@@ -84,8 +87,8 @@ void audioTask(void * parameter) {
             uint32_t rms = calculateRMS(buffer, bytes_read);
             Serial.print("RMS: ");
             Serial.println(rms);
-
             if (rms > THRESHOLD_RMS) {
+                xQueueSend(audioQueue, buffer, portMAX_DELAY);
                 is_speaking = true;
                 conversation_end = false;
                 silence_start_time = 0;
@@ -122,6 +125,8 @@ void audioTask(void * parameter) {
 void sendDataTask(void * parameter) {
     while (1) {
         while (is_speaking) {
+            uint8_t buffer_temp[BUFFER_SIZE];
+            xQueueReceive(audioQueue, buffer_temp, portMAX_DELAY);
             StaticJsonDocument<512> doc;
             JsonArray data_array = doc.createNestedArray("data");
 //序列分段
@@ -131,7 +136,7 @@ void sendDataTask(void * parameter) {
                 size_t end_index = min((i + 1) * 1024, (size_t)BUFFER_SIZE);
 
                 for (size_t j = start_index; j < end_index; ++j) {
-                    int16_t sample = (buffer[j * 2 + 1] << 8) | buffer[j * 2];
+                    int16_t sample = (buffer_temp[j * 2 + 1] << 8) | buffer_temp[j * 2];
                     data_array.add(sample);
                 }
                 
@@ -203,6 +208,11 @@ void setup() {
     connectWiFi();
     initI2S();
 
+    //初始化队列
+    audioQueue = xQueueCreate(QUEUELENGTH, BUFFER_SIZE);
+    if(audioQueue == NULL){
+        Serial.println("Queue creation failed");
+    }
     // 创建声音检测任务
     xTaskCreatePinnedToCore(audioTask, "AudioTask", 4096, NULL, 1, &taskHandle1, 0);
 
